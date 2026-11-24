@@ -1,0 +1,3 @@
+__pycache__/
+# Only written when the dataset's accuracy.npy is missing from the cache.
+data/raw_indexing/
