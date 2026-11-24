@@ -1,21 +1,23 @@
-# PolyIS Execution-Engine Operator Animation
+# Tetris Execution-Engine Operator Animation
 
 Self-contained D3 visualization of the 3 execution-engine operators
 (relevance classification → pruning → packing) from the PolyIS paper.
 
-## Regenerate the data (on the remote)
+## Regenerate the data (on ace)
+
+The generator imports the tetris library, so it runs on ace against the shared tetris checkout,
+data and cache. `run-on-ace.sh` pushes this repo to `ace:/work/cwkt/projects/demo`, runs the script in a
+throwaway container from the polyis image (tetris, data and cache mounted read-only), and pulls `data/` back:
 
 ```bash
-./sync
-ssh ace 'cd <repo_path> && docker exec polyis ./run demo/generate_data.py'
-rsync -av --delete ace:<repo_path>/demo/data/ demo/data/
+./run-on-ace.sh generate_data.py [flags]
 ```
 
 CLI overrides for `generate_data.py`:
 
 | Flag | Default | Notes |
 |---|---|---|
-| `--dataset` | `caldot1-y05` | Any dataset listed in `configs/global.yaml` |
+| `--dataset` | `caldot1-y05` | Any dataset listed in tetris's `configs/global.yaml` |
 | `--video` | first .mp4 in test set | Specific video file name |
 | `--frame-start` | `0` | Starting frame index |
 | `--num-frames` | `64` | Must be a square number for 8x8 layout |
@@ -31,7 +33,7 @@ CLI overrides for `generate_data.py`:
 The bundled demo data was generated with:
 
 ```bash
-./run demo/generate_data.py --dataset jnc0 --video te01.mp4 --frame-start 704 --overwrite
+./run-on-ace.sh generate_data.py --dataset jnc0 --video te01.mp4 --frame-start 704 --overwrite
 ```
 
 `jnc0/te01.mp4` frames 704–767 is a busy 4-way intersection with ~6 vehicles
@@ -49,10 +51,10 @@ shared cache path, then writes a viz-only `data/max_rate_table_viz.npy`.
 
 ## View the animation
 
-Serve the `demo/` directory and open `index.html`:
+Serve this repo and open `index.html`:
 
 ```bash
-cd demo && python -m http.server 8000
+python -m http.server 8000
 # then visit http://localhost:8000/index.html
 ```
 
@@ -74,4 +76,4 @@ data/
 └── raw_indexing/                   # (only present when accuracy.npy was missing)
 ```
 
-`data/` is gitignored — regenerate it via the script above.
+`data/` is tracked in git, so the deployed site needs no build step.

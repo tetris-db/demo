@@ -1,16 +1,12 @@
 name: Deploy demo to GitHub Pages
 
-# Publishes the contents of ./demo to the `gh-pages` branch on every push to
-# main (which includes commits landed via merged PRs). Manual runs are also
-# allowed via the "Run workflow" button on the Actions tab.
+# Publishes this repo to the `gh-pages` branch on every push to main (which
+# includes commits landed via merged PRs). Manual runs are also allowed via the
+# "Run workflow" button on the Actions tab.
 
 on:
   push:
     branches: [main]
-    paths:
-      # Only redeploy when the demo, the workflow, or shared assets change.
-      - 'demo/**'
-      - '.github/workflows/deploy-demo.yml'
   workflow_dispatch:
 
 # Avoid stacking deploys: if a new push lands while a deploy is in flight,
@@ -29,11 +25,11 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Publish ./demo to gh-pages
+      - name: Publish the site to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./demo
+          publish_dir: .
           publish_branch: gh-pages
           # Replace the branch with a single squashed commit each deploy so
           # gh-pages history stays small (the source-of-truth lives on main).

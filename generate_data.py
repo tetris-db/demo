@@ -2,7 +2,7 @@
 """
 Generate data files for the D3 demo visualization.
 
-Pipeline (all run on remote inside Docker via ./run demo/generate_data.py):
+Pipeline (run on ace in a throwaway polyis container via ./run-on-ace.sh generate_data.py):
   1. Extract `num_frames` consecutive (or sample_rate-spaced) frames from the chosen video; save as PNG.
   2. Compute per-frame relevance bitmaps from groundtruth tracks (same as p021).
   3. Group connected relevant tiles into polyominoes per frame.
@@ -30,11 +30,12 @@ import cv2
 import numpy as np
 from PIL import Image
 
-# Make sibling repo imports work whether we run from the repo root or anywhere else.
-# This file lives at <repo>/demo/generate_data.py, so the repo root is one parent up.
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+# The demo is its own repo, so tetris comes from a checkout: /polyis in the polyis image, TETRIS_ROOT elsewhere.
+TETRIS_ROOT = Path(os.environ.get('TETRIS_ROOT', '/polyis'))
+if str(TETRIS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TETRIS_ROOT))
+# This repo's data/, which index.html reads.
+DATA_DIR = Path(__file__).resolve().parent / 'data'
 
 from tetris.io import cache, store
 from tetris.pack.adapters import group_tiles_all
@@ -83,7 +84,7 @@ def parse_args():
                         help='ILP solver wall-clock time limit in seconds per M value.')
     parser.add_argument('--m-values', default='0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0',
                         help='Comma-separated mistrack-rate tolerance values in [0, 1].')
-    parser.add_argument('--output-dir', default=str(REPO_ROOT / 'viz' / 'demo' / 'data'))
+    parser.add_argument('--output-dir', default=str(DATA_DIR))
     parser.add_argument('--overwrite', action='store_true',
                         help='Allow clobbering an existing non-empty output directory.')
     parser.add_argument('--image-scale', type=float, default=1.0 / 6.0,

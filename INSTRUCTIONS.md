@@ -7,7 +7,7 @@ This document walks through every step from a fresh clone to a working visualiza
 ## 0. Prerequisites
 
 - **Local machine**: macOS or Linux with `ssh`, `rsync` (GNU rsync recommended), Python 3, and a modern browser (Chrome/Safari/Firefox).
-- **Remote machine**: SSH alias `ace` configured in `~/.ssh/config`, with the `polyis` Docker container already running (`docker ps` should show it). The project is mounted at `/polyis` inside the container.
+- **Remote machine**: SSH alias `ace` configured in `~/.ssh/config`, with the tetris checkout at `/work/cwkt/projects/tetris` (Cython extensions built) and the `polyis-polyis` image. `run-on-ace.sh` starts its own throwaway container, so the long-running `polyis` container is not needed.
 - **Required existing artifacts on the remote** (for the default dataset):
   - Videos at `/polyis-data/datasets/caldot1-y05/test/*.mp4`.
   - Groundtruth tracking at `/polyis-cache/caldot1-y05/execution/<video>/002_naive/tracking.jsonl` (produced by `p002_preprocess_groundtruth_tracking.py`).
@@ -15,25 +15,23 @@ This document walks through every step from a fresh clone to a working visualiza
 
 > Check whether the fast path is available:
 > ```bash
-> ssh ace 'docker exec polyis bash -c "ls /polyis-cache/caldot1-y05/indexing/track_rate/bytetrackcython_60/accuracy.npy"'
+> ssh ace 'ls /data/cwkt/data/polyis-cache/caldot1-y05/indexing/track_rate/bytetrackcython_60/accuracy.npy'
 > ```
 > If it prints the path, you're set. If not, the script will build it on first run.
 
 ---
 
-## 1. Push code to the remote
+## 1. How runs reach ace
 
-From your local repo root:
-
-```bash
-./sync
-```
-
-This rsyncs everything under `viz/` (configured in `configs/sync.yaml`) and all the usual source directories to `ace:/work/cwkt/projects/tetris/`.
+`./run-on-ace.sh <script.py> [flags]` rsyncs this repo (without `data/`) to `ace:/work/cwkt/projects/demo`,
+runs the script there in a throwaway container from the polyis image, and, after `generate_data.py`,
+rsyncs `data/` back over the local `data/`. The container mounts the tetris checkout, data and cache
+read-only and this repo read-write at `/demo`. Override the defaults with `DEMO_HOST`, `DEMO_REMOTE`,
+`TETRIS_CHECKOUT`, `DATA_ROOT` and `POLYIS_IMAGE`.
 
 ---
 
-## 2. Generate the data on the remote (inside Docker)
+## 2. Generate the data on ace
 
 The data-generation script is **non-destructive** — it refuses to overwrite an
 existing `data/` directory unless you pass `--overwrite`, and it never touches
@@ -48,7 +46,7 @@ demonstration: 0 → 292 polyominoes discarded as M goes from 0 to 1, and the
 canvas count drops from 16 → 6.
 
 ```bash
-ssh ace 'docker exec polyis bash -c "cd /polyis && python demo/generate_data.py --dataset jnc0 --video te01.mp4 --frame-start 704 --overwrite"'
+./run-on-ace.sh generate_data.py --dataset jnc0 --video te01.mp4 --frame-start 704 --overwrite
 ```
 
 Expected output (key lines):
@@ -63,7 +61,7 @@ Expected output (key lines):
 [M=0.10] discarded=150 / 404 canvases=11
 [M=0.50] discarded=237 / 404 canvases=8
 [M=1.00] discarded=292 / 404 canvases=6
-[done] Wrote data to /polyis/demo/data
+[done] Wrote data to /demo/data
 ```
 
 If you re-run, pass `--overwrite` (otherwise the script refuses to clobber an
@@ -92,7 +90,7 @@ All defaults are overridable. Full CLI:
 
 | Flag | Default | Notes |
 |---|---|---|
-| `--dataset` | `caldot1-y05` | Any dataset listed in `configs/global.yaml` |
+| `--dataset` | `caldot1-y05` | Any dataset listed in tetris's `configs/global.yaml` |
 | `--video` | first `.mp4` in `--videoset` | e.g. `te01.mp4` |
 | `--videoset` | `test` | `train` / `valid` / `test` |
 | `--frame-start` | `0` | Starting frame index |
@@ -106,20 +104,20 @@ All defaults are overridable. Full CLI:
 | `--packing-mode` | `first_fit` | `first_fit/best_fit/easiest_fit` |
 | `--time-limit` | `10.0` | ILP seconds per M value |
 | `--m-values` | `0.0,0.1,...,1.0` | Comma-separated, in `[0,1]` |
-| `--output-dir` | `demo/data` | Where to write outputs |
+| `--output-dir` | this repo's `data/` | Where to write outputs (a path inside the container) |
 | `--overwrite` | off | Pass to clobber an existing data dir |
 | `--image-scale` | `0.25` | Frame/polyomino PNGs are saved at this fraction of original pixel size (~16x smaller files at 0.25). JSON coords stay in original space; the browser stretches the smaller PNGs back up. Set to `1.0` for full-resolution. |
 
 Example — try `te01.mp4` (lots of activity from frame 0):
 
 ```bash
-ssh ace 'docker exec polyis bash -c "cd /polyis && python demo/generate_data.py --video te01.mp4 --frame-start 0 --overwrite"'
+./run-on-ace.sh generate_data.py --video te01.mp4 --frame-start 0 --overwrite
 ```
 
 Example — finer M slider (21 values, slower):
 
 ```bash
-ssh ace 'docker exec polyis bash -c "cd /polyis && python demo/generate_data.py --frame-start 192 --m-values 0.0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0 --overwrite"'
+./run-on-ace.sh generate_data.py --frame-start 192 --m-values 0.0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0 --overwrite
 ```
 
 ### 2c. Picking a frame range with enough activity — `scan_activity.py`
@@ -127,7 +125,7 @@ ssh ace 'docker exec polyis bash -c "cd /polyis && python demo/generate_data.py 
 To search across all configured datasets and surface the best windows, run:
 
 ```bash
-ssh ace 'docker exec polyis bash -c "cd /polyis && python demo/scan_activity.py"'
+./run-on-ace.sh scan_activity.py
 ```
 
 This slides a 64-frame window in steps of 32 over every test video, builds the
@@ -151,11 +149,9 @@ its `dataset`, `video`, and `start` to `generate_data.py`.
 
 ---
 
-## 3. Pull the generated data back to local
+## 3. Generated data
 
-```bash
-rsync -av --delete ace:/work/cwkt/projects/tetris/demo/data/ demo/data/
-```
+`run-on-ace.sh` pulls `data/` back automatically after a successful `generate_data.py` run.
 
 Expected size: ~30–80 MB depending on video resolution and polyomino count.
 Contents:
@@ -177,10 +173,9 @@ data/
 
 ## 4. View the visualization
 
-From the project root:
+From this repo's root:
 
 ```bash
-cd demo
 python3 -m http.server 8765
 ```
 
@@ -221,7 +216,7 @@ lsof -ti:8765 | xargs kill
 | ILP times out before finding optimum | Bump `--time-limit`. The default 10 s is enough for typical 64-frame windows; very dense scenes may need 30–60 s. |
 | Slider jumps too coarsely | Re-run with a finer `--m-values` list (e.g. 21 values at step 0.05). |
 | Browser shows a blank page | Check the JS console for fetch errors. If `data/meta.json` returns 404, the data step didn't complete or wasn't pulled back. |
-| `data/` exists, script refuses to run | Pass `--overwrite`, or `rm -rf demo/data` first. |
+| `data/` exists, script refuses to run | Pass `--overwrite`. |
 
 ---
 
@@ -230,10 +225,8 @@ lsof -ti:8765 | xargs kill
 For everyday regeneration once you've already configured everything:
 
 ```bash
-./sync && \
-  ssh ace 'docker exec polyis bash -c "cd /polyis && python demo/generate_data.py --dataset jnc0 --video te01.mp4 --frame-start 704 --overwrite"' && \
-  rsync -av --delete ace:/work/cwkt/projects/tetris/demo/data/ demo/data/ && \
-  (cd demo && python3 -m http.server 8765)
+./run-on-ace.sh generate_data.py --dataset jnc0 --video te01.mp4 --frame-start 704 --overwrite && \
+  python3 -m http.server 8765
 ```
 
 Then open <http://localhost:8765/index.html>.

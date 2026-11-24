@@ -14,15 +14,17 @@ sorting key to taste.
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+# The demo is its own repo, so tetris comes from a checkout: /polyis in the polyis image, TETRIS_ROOT elsewhere.
+TETRIS_ROOT = Path(os.environ.get('TETRIS_ROOT', '/polyis'))
+if str(TETRIS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TETRIS_ROOT))
 
 from tetris.io import store
 from tetris.pack.adapters import group_tiles_all

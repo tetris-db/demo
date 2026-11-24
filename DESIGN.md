@@ -53,7 +53,7 @@ Stages 1–3, 6 share the **frame-grid viewBox**; stages 4–5 share the
 ## 3. Pipeline (`generate_data.py`)
 
 Everything the browser shows comes from a single Python script that runs on
-the remote inside the polyis Docker container. The script is deliberately
+ace in a throwaway polyis container (`run-on-ace.sh`), importing tetris from ace's checkout. The script is deliberately
 non-destructive — it refuses to clobber an existing `data/` directory unless
 `--overwrite` is passed, and it **never** writes back to the standard
 `/polyis-cache/.../indexing/` paths.
@@ -139,7 +139,7 @@ This avoids picking windows where everything overlaps a single road segment.
 
 ## 4. Front-end architecture
 
-Three files at the root of `demo/`:
+Three files at the root of this repo:
 
 - **`index.html`** — DOM shell. Header, stage breadcrumb (`<ol id="stages-nav">`),
   controls bar, legend, and a single `<svg id="stage">` that contains the
@@ -318,13 +318,12 @@ array.
 
 ## 6. Deployment
 
-A GitHub Action (`.github/workflows/deploy-demo.yml`) publishes `./demo`
-to the `gh-pages` branch on every push to `main` that touches `demo/**`
-(or the workflow file). It uses `peaceiris/actions-gh-pages@v4` with
+A GitHub Action (`.github/workflows/deploy-demo.yml`) publishes this repo
+to the `gh-pages` branch on every push to `main`. It uses `peaceiris/actions-gh-pages@v4` with
 `force_orphan: true` so the deploy branch stays a single commit. Manual
 runs are also available via the Actions tab.
 
-The `demo/data/` directory is **tracked in git** (not ignored), so the
+The `data/` directory is **tracked in git** (not ignored), so the
 PNGs and JSON ride along on every deploy without any extra build step.
 
 ---
@@ -352,14 +351,14 @@ parameter changed.
 Re-run `generate_data.py` with the appropriate flags:
 
 ```bash
-./run demo/generate_data.py --dataset <name> --video <file.mp4> \
+./run-on-ace.sh generate_data.py --dataset <name> --video <file.mp4> \
   --frame-start <n> --overwrite
 ```
 
 Or run `scan_activity.py` first to find the busiest window:
 
 ```bash
-./run demo/scan_activity.py
+./run-on-ace.sh scan_activity.py
 ```
 
 Pick a row from its ranked output, then plug the values into
